@@ -1,0 +1,43 @@
+.scroll-table {
+    display:block;
+    max-height: 400px;
+    overflow-y: auto;
+    border: solid 1px black;
+    border-collapse: collapse;
+    width: 50% !important;
+}
+.scroll-table table{
+    width: 100%;
+    border-collapse: collapse;
+}
+.scroll-table th, .scroll-table td {
+    overflow: hidden;
+    border-right: solid 1px black;
+    border-bottom: solid 1px black;
+    padding: 5px;
+    max-height: 100px;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    white-space: nowrap;
+}
+
+.scroll-table th {
+    border-bottom: solid 1px black; 
+}
+
+.scroll-table tr:last-child td {
+    border-bottom: none; 
+}
+
+.scroll-table td:last-child {
+    border-right: none;
+}
+
+@keyframes highlight {
+    from { background-color: yellow; }
+    to { background-color: transparent; }
+}
+
+.new-row {
+    animation: highlight 1s; /* Adjust the time as needed */
+}
