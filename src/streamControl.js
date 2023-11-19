@@ -16,7 +16,9 @@ const StreamControl = (props) => {
         props.setCommentsDPData([]);
         props.positiveCount.current = 0;
         props.negativeCount.current = 0;
-        var epsilon = 10;
+        props.positiveDPCount.current = 0;
+        props.negativeDPCount.current = 0;
+        var epsilon = 1;
         var sensitivity_score = 1;
         if (!postsEventSource) {
             const newPostsEventSource = new EventSource('http://localhost:4000/stream/posts');
@@ -46,6 +48,13 @@ const StreamControl = (props) => {
                 .then(response => response.json())
                 .then(data => {
                     newDPData['sentiment_score'] = data; // Assuming the response contains the data you need
+                    newDPData['sentiment'] = data['compound'] > 0 ? 'Positive' : 'Negative';
+                    if(newDPData['sentiment']  === 'Positive'){
+                        props.positiveDPCount.current = props.positiveDPCount.current + 1;
+                    }
+                    else if(newDPData['sentiment']  === 'Negative'){
+                        props.negativeDPCount.current = props.negativeDPCount.current + 1;
+                    }
                     props.setPostsDPData(currentData => [{...newDPData, isNew: true}, ...currentData.map(d => ({...d, isNew: false}))]);
                     console.log('New post data:', newDPData['sentiment_score']);
                 })
@@ -65,7 +74,7 @@ const StreamControl = (props) => {
                 if(newData.sentiment === 'Positive'){
                     props.positiveCount.current = props.positiveCount.current + 1;
                 }
-                else if(newData.sentiment === 'Negative' && newData.sentiment_score['neg'] > 0){
+                else if(newData.sentiment === 'Negative'){
                     props.negativeCount.current = props.negativeCount.current + 1;
                 }
                 props.setCommentsData(currentData => [{...newData, isNew: true}, ...currentData.map(d => ({...d, isNew: false}))]);
@@ -83,6 +92,14 @@ const StreamControl = (props) => {
                 .then(response => response.json())
                 .then(data => {
                     newDPData['sentiment_score'] = data; // Assuming the response contains the data you need
+                    newDPData['sentiment'] = data['compound'] > 0 ? 'Positive' : 'Negative';
+                    console.log("DP Sentiment:", data)
+                    if(newDPData['sentiment'] === 'Positive'){
+                        props.positiveDPCount.current = props.positiveDPCount.current + 1;
+                    }
+                    else if(newDPData['sentiment'] === 'Negative'){
+                        props.negativeDPCount.current = props.negativeDPCount.current + 1;
+                    }
                     props.setCommentsDPData(currentData => [{...newDPData, isNew: true}, ...currentData.map(d => ({...d, isNew: false}))]);
                     console.log('New post data:', newDPData['sentiment_score']);
                 })

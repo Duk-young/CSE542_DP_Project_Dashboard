@@ -35,7 +35,7 @@ import './table.css';
                             <TableCell>{item.author}</TableCell>
                             <TableCell>{item.body}</TableCell>
                             <TableCell>{item.sentiment}</TableCell>
-                            <TableCell>{item.sentiment === 'Positive' ? item.sentiment_score['pos'] : item.sentiment === 'Negative' ? item.sentiment_score['neg'] : item.sentiment_score['neu']}</TableCell>
+                            <TableCell>{item.sentiment_score['compound']}</TableCell>
                             <TableCell>{item.created}</TableCell>
                         </TableRow>
                     ))}
