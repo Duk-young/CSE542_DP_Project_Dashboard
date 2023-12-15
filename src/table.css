@@ -1,24 +1,28 @@
 .scroll-table {
-    display:block;
+    display: block;
     max-height: 400px;
     overflow-y: auto;
     border: solid 1px black;
     border-collapse: collapse;
-    width: 50% !important;
+    width: 50vw;
+    max-width: 100%;
 }
-.scroll-table table{
+.scroll-table table {
     width: 100%;
+    table-layout: fixed; /* Add fixed table layout */
     border-collapse: collapse;
 }
+
 .scroll-table th, .scroll-table td {
-    overflow: hidden;
+    overflow: hidden; /* Handle overflow */
     border-right: solid 1px black;
     border-bottom: solid 1px black;
     padding: 5px;
     max-height: 100px;
     text-overflow: ellipsis;
-    max-width: 200px;
+    max-width: 50%; /* Set max width for cells */
     white-space: nowrap;
+    word-wrap: break-word; /* Allow word wrapping */
 }
 
 .scroll-table th {

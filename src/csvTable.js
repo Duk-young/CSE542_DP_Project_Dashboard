@@ -11,6 +11,8 @@ import './table.css';
 
 // Function to render CSV tables
  const renderCSVTable = (data, dataType) => {
+    // console.log(data);
+    // console.log("RenderCSV",data);
     return (
         <TableContainer component={Paper} className="scroll-table">
             <Table stickyHeader>
@@ -28,7 +30,7 @@ import './table.css';
                 </TableHead>
                 <TableBody>
                     {data.map((item, index) => (
-                        <TableRow key={`${item.id}`} className={item.isNew ? "new-row" : ""}>
+                        <TableRow key={`${item.id}+${index}`} className={item.isNew ? "new-row" : ""}>
                             <TableCell>{item.title}</TableCell>
                             {/* <TableCell>{dataType === 'posts' ? item.url : 'N/A'}</TableCell> */}
                             {/* <TableCell>{dataType === 'posts' ? item.total_comments : 'N/A'}</TableCell> */}

@@ -7,13 +7,80 @@ import TextField from '@mui/material/TextField';
 const StreamControl = (props) => {
     const [postsEventSource, setPostsEventSource] = useState(null);
     const [commentsEventSource, setCommentsEventSource] = useState(null);
-
     // Function to start streaming
+    const parseTimestamp = (timestampString) => {
+        return new Date(timestampString);
+    };
+    const getHourlyWindow = (date) => {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0'); // +1 because getMonth() returns 0-11
+        const day = date.getDate().toString().padStart(2, '0');
+        const hour = date.getHours().toString().padStart(2, '0');
+    
+        return `${year}-${month}-${day} ${hour}:00:00`;
+    };
+
+    const addToPostAggregation = (dataPoint) => {
+        console.log(dataPoint);
+        const timestamp = parseTimestamp(dataPoint.created);
+        const hourlyWindow = getHourlyWindow(timestamp) // Unique number for the hourly window
+
+        props.setAggregatedPosts(prevAggregatedPosts => {
+            const newAggregatedPosts = new Map(prevAggregatedPosts);
+    
+            // Check if the hourly window key exists, if not, initialize it
+            if (!newAggregatedPosts.has(hourlyWindow)) {
+                newAggregatedPosts.set(hourlyWindow, {'title':[], 'author':[], 'body':[],'created':[],'id':[],'sentiment_scores': []});
+            }
+
+    
+            // Update the value for the hourly window key
+            const updatedTitles = [...newAggregatedPosts.get(hourlyWindow)["title"], dataPoint.title];
+            const updatedAuthors = [...newAggregatedPosts.get(hourlyWindow)["author"], dataPoint.author];
+            const updatedBodies = [...newAggregatedPosts.get(hourlyWindow)["body"], dataPoint.body];
+            const updatedCreated = [...newAggregatedPosts.get(hourlyWindow)["created"], dataPoint.created];
+            const updatedIds = [...newAggregatedPosts.get(hourlyWindow)["id"], dataPoint.id];
+            const updatedScores = [...newAggregatedPosts.get(hourlyWindow)["sentiment_scores"], dataPoint.sentiment_score['compound']];
+            newAggregatedPosts.set(hourlyWindow, { 'title':updatedTitles, 'author':updatedAuthors, 'body':updatedBodies,'created':updatedCreated,'id':updatedIds, 'sentiment_scores': updatedScores });
+    
+            // console.log("addToPost", newAggregatedPosts);
+            return newAggregatedPosts;
+        });
+    };
+
+    const addToCommentAggregation = (dataPoint) => {
+        const timestamp = parseTimestamp(dataPoint.created);
+        const hourlyWindow = getHourlyWindow(timestamp) // Unique number for the hourly window
+
+        props.setAggregatedComments(prevAggregatedComments => {
+            const newAggregatedComments = new Map(prevAggregatedComments);
+    
+            // Check if the hourly window key exists, if not, initialize it
+            if (!newAggregatedComments.has(hourlyWindow)) {
+                newAggregatedComments.set(hourlyWindow, {'title':[], 'author':[], 'body':[],'created':[],'id':[],'sentiment_scores': []});
+            }
+    
+            // Update the value for the hourly window key
+            const updatedTitles = [...newAggregatedComments.get(hourlyWindow)["title"], dataPoint.title];
+            const updatedAuthors = [...newAggregatedComments.get(hourlyWindow)["author"], dataPoint.author];
+            const updatedBodies = [...newAggregatedComments.get(hourlyWindow)["body"], dataPoint.body];
+            const updatedCreated = [...newAggregatedComments.get(hourlyWindow)["created"], dataPoint.created];
+            const updatedIds = [...newAggregatedComments.get(hourlyWindow)["id"], dataPoint.id];
+            const updatedScores = [...newAggregatedComments.get(hourlyWindow)["sentiment_scores"], dataPoint.sentiment_score['compound']];
+            newAggregatedComments.set(hourlyWindow,  { 'title':updatedTitles, 'author':updatedAuthors, 'body':updatedBodies,'created':updatedCreated,'id':updatedIds, 'sentiment_scores': updatedScores });
+    
+            // console.log("addToComments", newAggregatedComments);
+            return newAggregatedComments;
+        });
+    };  
+
     const startStreaming = () => {
         props.setPostsData([]);
         props.setCommentsData([]);
-        props.setPostsDPData([]);
-        props.setCommentsDPData([]);
+        props.setAggregatedPosts(new Map());
+        props.setAggregatedComments(new Map());
+        props.setDPAggregatedPosts(new Map());
+        props.setDPAggregatedComments(new Map());
         props.positiveCount.current = 0;
         props.negativeCount.current = 0;
         props.positiveDPCount.current = 0;
@@ -21,90 +88,44 @@ const StreamControl = (props) => {
         var epsilon = 1;
         var sensitivity_score = 1;
         if (!postsEventSource) {
-            const newPostsEventSource = new EventSource('http://localhost:4000/stream/posts');
+            const newPostsEventSource = new EventSource(`http://localhost:4000/stream/posts?community=${props.subreddit}`);
             console.log("Post Stream setup");
+
             newPostsEventSource.onmessage = (event) => {
                 const newData = JSON.parse(event.data);
                 const newDPData = JSON.parse(event.data);
-                // // Handle the new data (e.g., updating state or props)
                 if(newData.sentiment === 'Positive'){
                     props.positiveCount.current = props.positiveCount.current + 1;
                 }
                 else if(newData.sentiment === 'Negative'){
                     props.negativeCount.current = props.negativeCount.current + 1;
                 }
+
+                addToPostAggregation(newData);
+
                 props.setPostsData(currentData => [{...newData, isNew: true}, ...currentData.map(d => ({...d, isNew: false}))]);
-                fetch('http://localhost:4000/stream/apply-dp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        'sentiment_score': newDPData['sentiment_score'],
-                        'epsilon': epsilon,
-                        'sensitivity_score': sensitivity_score
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    newDPData['sentiment_score'] = data; // Assuming the response contains the data you need
-                    newDPData['sentiment'] = data['compound'] > 0 ? 'Positive' : 'Negative';
-                    if(newDPData['sentiment']  === 'Positive'){
-                        props.positiveDPCount.current = props.positiveDPCount.current + 1;
-                    }
-                    else if(newDPData['sentiment']  === 'Negative'){
-                        props.negativeDPCount.current = props.negativeDPCount.current + 1;
-                    }
-                    props.setPostsDPData(currentData => [{...newDPData, isNew: true}, ...currentData.map(d => ({...d, isNew: false}))]);
-                    console.log('New post data:', newDPData['sentiment_score']);
-                })
-                .catch(error => console.error('Error:', error));
-                // console.log('New post data:', newDPData['sentiment_score']);
             };
             setPostsEventSource(newPostsEventSource);
         }
-
+    // Comment Streaming below
         if (!commentsEventSource) {
-            const newCommentsEventSource = new EventSource('http://localhost:4000/stream/comments');
+            const newCommentsEventSource = new EventSource(`http://localhost:4000/stream/comments?community=${props.subreddit}`);
             console.log("Comment Stream setup");
+
             newCommentsEventSource.onmessage = (event) => {
                 const newData = JSON.parse(event.data);
                 const newDPData = JSON.parse(event.data);
-                // // Handle the new data (e.g., updating state or props)
+
                 if(newData.sentiment === 'Positive'){
                     props.positiveCount.current = props.positiveCount.current + 1;
                 }
                 else if(newData.sentiment === 'Negative'){
                     props.negativeCount.current = props.negativeCount.current + 1;
                 }
+
+                addToCommentAggregation(newData);
+
                 props.setCommentsData(currentData => [{...newData, isNew: true}, ...currentData.map(d => ({...d, isNew: false}))]);
-                fetch('http://localhost:4000/stream/apply-dp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        'sentiment_score': newDPData['sentiment_score'],
-                        'epsilon': epsilon,
-                        'sensitivity_score': sensitivity_score
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    newDPData['sentiment_score'] = data; // Assuming the response contains the data you need
-                    newDPData['sentiment'] = data['compound'] > 0 ? 'Positive' : 'Negative';
-                    console.log("DP Sentiment:", data)
-                    if(newDPData['sentiment'] === 'Positive'){
-                        props.positiveDPCount.current = props.positiveDPCount.current + 1;
-                    }
-                    else if(newDPData['sentiment'] === 'Negative'){
-                        props.negativeDPCount.current = props.negativeDPCount.current + 1;
-                    }
-                    props.setCommentsDPData(currentData => [{...newDPData, isNew: true}, ...currentData.map(d => ({...d, isNew: false}))]);
-                    console.log('New post data:', newDPData['sentiment_score']);
-                })
-                .catch(error => console.error('Error:', error));
-                // console.log('New comment data:', event.data);
             };
             setCommentsEventSource(newCommentsEventSource);
         }
@@ -141,42 +162,9 @@ const StreamControl = (props) => {
         };
     }, [postsEventSource, commentsEventSource]);
 
-// Function to render CSV tables
-// const renderCSVTable = (data, dataType) => {
-//     return (
-//         <TableContainer component={Paper} className="scroll-table">
-//             <Table stickyHeader>
-//                 <TableHead>
-//                     <TableRow>
-//                         <TableCell>Title</TableCell>
-//                         {/* <TableCell>URL</TableCell> */}
-//                         {/* <TableCell>Total Comments</TableCell> */}
-//                         <TableCell>Author</TableCell>
-//                         <TableCell>Body</TableCell>
-//                         <TableCell>Sentiment</TableCell>
-//                         <TableCell>Sentiment Score</TableCell>
-//                         <TableCell>Created</TableCell>
-//                     </TableRow>
-//                 </TableHead>
-//                 <TableBody>
-//                     {data.map((item, index) => (
-//                         <TableRow key={`${item.id}`} className={item.isNew ? "new-row" : ""}>
-//                             <TableCell>{item.title}</TableCell>
-//                             {/* <TableCell>{dataType === 'posts' ? item.url : 'N/A'}</TableCell> */}
-//                             {/* <TableCell>{dataType === 'posts' ? item.total_comments : 'N/A'}</TableCell> */}
-//                             <TableCell>{item.author}</TableCell>
-//                             <TableCell>{item.body}</TableCell>
-//                             <TableCell>{item.sentiment}</TableCell>
-//                             <TableCell>{item.sentiment === 'Positive' ? item.sentiment_score['pos'] : item.sentiment === 'Negative' ? item.sentiment_score['neg'] : item.sentiment_score['neu']}</TableCell>
-//                             <TableCell>{item.created}</TableCell>
-//                         </TableRow>
-//                     ))}
-//                 </TableBody>
-//             </Table>
-//         </TableContainer>
-//     );
-// };
-
+    const handleTextFieldChange = (event) => {
+        props.setSubreddit(event.target.value);
+    };
 return (
     <div>
     <div style={{textAlign: '-webkit-center'}}>
@@ -189,26 +177,9 @@ return (
         marginTop: '15px'
       }}
     >
-      <TextField fullWidth label="Subreddit Community Name" id="subreddit_name" defaultValue={'IsarelPalestine'}/>
+      <TextField fullWidth label="Subreddit Community Name" id="subreddit_name" defaultValue={props.subreddit} onChange={handleTextFieldChange}/>
     </Box>
     </div>
-    {/* <div style={{ display: 'flex' }}>
-        <div style={{ flex: 1, padding: '10px' }}>
-            <h2>Posts (No DP)</h2>
-            {renderCSVTable(postsData, 'posts')}
-            <h2>Comments (No DP)</h2>
-            {renderCSVTable(commentsData, 'comments')}
-            {SentimentBarChart(positiveCount, negativeCount)}
-        </div>
-
-        <div style={{ flex: 1, padding: '10px' }}>
-            <h2>Posts (DP)</h2>
-            {renderCSVTable(postsData, 'posts')}
-            <h2>Comments (DP)</h2>
-            {renderCSVTable(commentsData, 'comments')}
-            {SentimentBarChart(positiveCount, negativeCount)}
-        </div>
-    </div> */}
     </div>
 );
 };
